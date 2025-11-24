@@ -7,7 +7,7 @@
 > **AWS/GCP IAM Least Privilege Auditor** — автоматизированный анализ IAM-политик и рекомендации по минимизации привилегий  
 > *AWS/GCP IAM Least Privilege Auditor — automated IAM policy analysis and privilege minimization recommendations*
 
-🌐 **[run-as-daemon.ru](https://run-as-daemon.ru)** | 👨‍💻 **[@ranas-mukminov](https://github.com/ranas-mukminov)**
+🌐 **[run-as-daemon.dev](https://run-as-daemon.dev)** | 👨‍💻 **[@ranas-mukminov](https://github.com/ranas-mukminov)**
 
 [🇷🇺 Русская версия](README.ru.md) | [🇺🇸 English version](README.md)
 
@@ -111,7 +111,7 @@ Security Findings:
 
 ======================================================================
 For enterprise features and commercial support:
-🌐 https://run-as-daemon.ru
+🌐 https://run-as-daemon.dev
 📧 Contact: @ranas-mukminov
 ======================================================================
 ```
@@ -236,11 +236,12 @@ jobs:
 - При использовании в production-окружениях российских компаний убедитесь в соблюдении требований **152-ФЗ "О персональных данных"**
 - Для обработки персональных данных клиентов требуется их согласие
 - Рекомендуется хранить отчёты в защищённых хранилищах с контролем доступа
+- **For Russian Federation compliance inquiries, please visit our local mirror: [run-as-daemon.ru](https://run-as-daemon.ru)**
 
 **Для аудита соответствия:**
 - Используйте JSON-вывод для интеграции с системами SIEM
 - Результаты можно экспортировать в Elasticsearch/Grafana для визуализации
-- Контакт для консультаций: **[run-as-daemon.ru](https://run-as-daemon.ru)**
+- Контакт для консультаций: **[run-as-daemon.dev](https://run-as-daemon.dev)**
 
 ---
 
@@ -259,7 +260,7 @@ jobs:
 - ✅ **Разработка кастомных политик и правил**
 
 ### Контакты:
-- 🌐 **Website:** [run-as-daemon.ru](https://run-as-daemon.ru)
+- 🌐 **Website:** [run-as-daemon.dev](https://run-as-daemon.dev)
 - 📧 **Email:** [через форму на сайте]
 - 💼 **GitHub:** [@ranas-mukminov](https://github.com/ranas-mukminov)
 
@@ -348,4 +349,4 @@ Copyright (c) 2025 Ranas Mukminov (@ranas-mukminov)
 ---
 
 **Made with ❤️ by [@ranas-mukminov](https://github.com/ranas-mukminov)**  
-**[run-as-daemon.ru](https://run-as-daemon.ru)** — Your DevSecOps Partner
+**[run-as-daemon.dev](https://run-as-daemon.dev)** — Your DevSecOps Partner

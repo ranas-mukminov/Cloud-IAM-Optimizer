@@ -16,44 +16,31 @@ parts/
 sdist/
 var/
 wheels/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# Virtual Environment
+# Virtual Env
 venv/
-ENV/
 env/
+ENV/
+.env
 .venv
+env.bak/
+venv.bak/
 
-# IDE
-.vscode/
+# IDEs
 .idea/
+.vscode/
 *.swp
 *.swo
-*~
-.DS_Store
 
-# Environment & Secrets
-.env
-.env.local
-*.pem
-*.key
-credentials.json
-service-account*.json
-
-# Reports & Logs
+# Logs and Databases
 *.log
-reports/
-iam-audit*.json
-iam-reports/
-
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
-.tox/
+*.sqlite
 
 # OS
+.DS_Store
 Thumbs.db
