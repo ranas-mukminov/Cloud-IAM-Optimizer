@@ -1,76 +1,76 @@
 # Cloud-IAM-Optimizer
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Python](https://img.shields.io/badge/python-3.8%2B-blue)
-![Status](https://img.shields.io/badge/status-production--ready-green)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
-**Official Tripwire Tool of Ranas Security Stack**
+**AWS/GCP IAM Least Privilege Auditor**
 
-Cloud-IAM-Optimizer is a powerful CLI tool designed to scan your AWS IAM environment for critical security risks. It identifies unused keys, users without MFA, and dangerous administrative privileges, helping you enforce least privilege and secure your cloud infrastructure.
+Cloud-IAM-Optimizer is a powerful tool designed to audit your cloud infrastructure's Identity and Access Management (IAM) configurations. It helps you identify over-privileged accounts and enforce the principle of least privilege across AWS and GCP environments.
 
-**Powered by Ranas Security Stack (run-as-daemon.dev)**
+**Commercial Brand:** [run-as-daemon.dev](https://run-as-daemon.dev)
 
 ## Features
 
-- **MFA Audit:** Identifies users with Multi-Factor Authentication disabled.
-- **Stale Key Detection:** Flags access keys older than 90 days.
-- **Privilege Escalation Check:** Detects users with `AdministratorAccess` attached directly or via groups.
-- **Production Ready:** Built with robust error handling and structured output.
-- **Flexible Output:** Supports both human-readable text (with color coding) and JSON for automation.
+- **Multi-Cloud Support:** Audit both AWS and GCP IAM policies.
+- **Least Privilege Analysis:** Identify unused permissions and risky configurations.
+- **Flexible Output:** Generate reports in JSON or human-readable text formats.
+- **CLI Interface:** Easy-to-use command-line interface for integration into CI/CD pipelines.
 
 ## Quick Start
 
-### Installation
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/ranas-mukminov/Cloud-IAM-Optimizer.git
+    cd Cloud-IAM-Optimizer
+    ```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/ranas-mukminov/Cloud-IAM-Optimizer.git
-   cd Cloud-IAM-Optimizer
-   ```
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+3.  **Run an audit:**
+    ```bash
+    python src/main.py audit --provider aws --output text
+    ```
 
-### Usage
-
-Run the audit against your default AWS profile:
-
-```bash
-python src/main.py audit
-```
-
-Specify a profile and output format:
+## Usage
 
 ```bash
-python src/main.py audit --profile my-prod-profile --output json
-```
+Usage: main.py audit [OPTIONS]
 
-Check version and support info:
+  Run an IAM audit for the specified provider.
 
-```bash
-python src/main.py version
+Options:
+  --provider [aws|gcp]  Cloud provider to audit.  [required]
+  --output [json|text]  Output format.
+  --help                Show this message and exit.
 ```
 
 ## Commercial Support
 
-Need a full infrastructure audit or custom security implementation?
+We offer professional support and auditing services for your cloud infrastructure.
 
-**Book a 15-min slot with the author:** [https://run-as-daemon.dev](https://run-as-daemon.dev)
+- **Infrastructure Audit:** Comprehensive security and performance analysis.
+- **Monitoring & Backup:** Implementation of robust monitoring and backup solutions.
+- **DevOps/SRE Support:** Ongoing support for your development and operations teams.
 
-We offer:
-- Comprehensive Cloud Security Audits
-- DevSecOps Pipeline Implementation
-- Infrastructure as Code (Terraform/Pulumi) Hardening
-- Compliance Readiness (SOC2, ISO27001)
+For commercial inquiries and support, please visit: **[run-as-daemon.dev](https://run-as-daemon.dev)**
+
+> [!NOTE]
+> For Russian Federation compliance inquiries, please visit our local mirror: [run-as-daemon.ru](https://run-as-daemon.ru)
 
 ## Privacy & Compliance
 
-This tool runs entirely locally on your machine. No data is sent to external servers.
-- **Logs:** No sensitive data is logged to disk.
-- **Credentials:** Uses standard AWS SDK (boto3) credential chains.
+This tool is designed to be run within your own infrastructure. It does not send any data to external servers.
+
+- **Data Collection:** The tool processes IAM data locally to generate reports.
+- **Logs:** No sensitive data is logged by default. Ensure you configure your environment to handle logs securely.
+- **Compliance:** Users are responsible for ensuring compliance with local regulations (e.g., 152-FZ in Russia) when using this tool in production.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+Copyright (c) 2025 Ranas Mukminov | [run-as-daemon.dev](https://run-as-daemon.dev)
