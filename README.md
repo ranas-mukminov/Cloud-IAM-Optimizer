@@ -22,11 +22,11 @@ graph LR
     Client([👤 Client / CTO]):::user
     
     subgraph "Public Internet"
-        CF[☁️ Cloudflare Edge<br/>(DDoS Protection & SSL)]:::cloud
+        CF["☁️ Cloudflare Edge<br/>(DDoS Protection & SSL)"]:::cloud
     end
 
     subgraph "Secure Tunnel"
-        Tunnel[🚇 CF Tunnel<br/>(No Open Ports)]:::secure
+        Tunnel["🚇 CF Tunnel<br/>(No Open Ports)"]:::secure
     end
 
     subgraph "Private Infrastructure"
