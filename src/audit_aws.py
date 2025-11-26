@@ -30,8 +30,16 @@ class IAMAuditor:
         try:
             mfa_devices = self.iam.list_mfa_devices(UserName=user_name)
             return len(mfa_devices['MFADevices']) > 0
-        except (ClientError, BotoCoreError) as e:
-            print(f"Error checking MFA for {user_name}: {e}")
+        except ClientError as e:
+            # Если ошибка 'NoSuchEntity' (нет MFA) - это ок, возвращаем False
+            if e.response['Error']['Code'] == 'NoSuchEntity':
+                return False
+            # Если любая ДРУГАЯ ошибка (нет прав, сеть и т.д.) - выводим её и возвращаем False с предупреждением
+            else:
+                print(f"⚠️  Error checking MFA for {user_name}: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
+                return False
+        except BotoCoreError as e:
+            print(f"⚠️  BotoCore error checking MFA for {user_name}: {e}")
             return False
 
     def check_old_access_keys(self, user_name: str, max_age_days: int = 90) -> List[Dict[str, Any]]:
