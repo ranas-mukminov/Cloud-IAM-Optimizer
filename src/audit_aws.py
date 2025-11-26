@@ -1,7 +1,8 @@
 import boto3
 import datetime
-from botocore.exceptions import ClientError, NoCredentialsError, BotoCoreError
+from botocore.exceptions import ClientError, BotoCoreError
 from typing import Dict, List, Any
+
 
 class IAMAuditor:
     def __init__(self, profile_name: str = None):
@@ -36,7 +37,12 @@ class IAMAuditor:
                 return False
             # Если любая ДРУГАЯ ошибка (нет прав, сеть и т.д.) - выводим её и возвращаем False с предупреждением
             else:
-                print(f"⚠️  Error checking MFA for {user_name}: {e.response['Error']['Code']} - {e.response['Error']['Message']}")
+                error_code = e.response['Error']['Code']
+                error_msg = e.response['Error']['Message']
+                print(
+                    f"⚠️  Error checking MFA for {user_name}: "
+                    f"{error_code} - {error_msg}"
+                )
                 return False
         except BotoCoreError as e:
             print(f"⚠️  BotoCore error checking MFA for {user_name}: {e}")
@@ -53,7 +59,7 @@ class IAMAuditor:
                     # Ensure timezone awareness compatibility
                     if create_date.tzinfo is None:
                         create_date = create_date.replace(tzinfo=datetime.timezone.utc)
-                    
+
                     age = (datetime.datetime.now(datetime.timezone.utc) - create_date).days
                     if age > max_age_days and key['Status'] == 'Active':
                         old_keys.append({
@@ -73,7 +79,7 @@ class IAMAuditor:
             for policy in attached_policies['AttachedPolicies']:
                 if policy['PolicyName'] == 'AdministratorAccess':
                     return True
-            
+
             # Check groups
             groups = self.iam.list_groups_for_user(UserName=user_name)
             for group in groups['Groups']:

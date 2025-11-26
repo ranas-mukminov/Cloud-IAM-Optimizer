@@ -4,11 +4,13 @@ from colorama import init, Fore, Style
 # Initialize colorama
 init(autoreset=True)
 
+
 @click.group()
 @click.version_option(version="0.1.0")
 def cli():
     """Cloud-IAM-Optimizer: AWS/GCP IAM Least Privilege Auditor."""
     pass
+
 
 @cli.command()
 @click.option('--provider', type=click.Choice(['aws', 'gcp']), required=True, help='Cloud provider to audit.')
@@ -16,9 +18,10 @@ def cli():
 def audit(provider, output):
     """Run an IAM audit for the specified provider."""
     click.echo(f"{Fore.CYAN}Starting audit for provider: {Style.BRIGHT}{provider}{Style.RESET_ALL}")
-    
+
     # Placeholder for logic
     _run_audit_logic(provider, output)
+
 
 def _run_audit_logic(provider, output):
     """Placeholder for the actual audit logic."""
@@ -28,6 +31,7 @@ def _run_audit_logic(provider, output):
         click.echo('{"status": "not_implemented"}')
     else:
         click.echo("Status: Not Implemented")
+
 
 if __name__ == '__main__':
     cli()
