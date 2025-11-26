@@ -1,102 +1,103 @@
 import boto3
 import datetime
-from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
+import sys
+from botocore.exceptions import ClientError, NoCredentialsError
 
-# Настройки: Считать ключи старыми, если им больше X дней
+# Настройки
 DAYS_LIMIT = 90
 
 
 def get_iam_client():
-    """Initialize and return an AWS IAM client."""
-    return boto3.client('iam')
+    # Пытаемся создать клиента.
+    # Если нет ключей — падаем сразу с понятной ошибкой.
+    try:
+        return boto3.client('iam')
+    except NoCredentialsError:
+        print("❌ ERROR: No AWS credentials found.")
+        print(
+            "   Please configure them via 'aws configure' or set "
+            "AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY."
+        )
+        sys.exit(1)
 
 
 def audit_users():
-    """Run IAM security audit for all users."""
-    try:
-        client = get_iam_client()
-        # Get all users with pagination and error handling
-        paginator = client.get_paginator('list_users')
-        users = []
-        for page in paginator.paginate():
-            users.extend(page['Users'])
-    except (NoCredentialsError, PartialCredentialsError):
-        print("🚨 FATAL: No AWS credentials found.")
-        print("   Please configure credentials via 'aws configure' or environment variables.")
-        return
-    except ClientError as e:
-        print(f"🚨 FATAL: Cannot list IAM users: {e.response['Error']['Code']}")
-        print(f"   Message: {e.response['Error']['Message']}")
-        print("\nPlease ensure you have 'iam:ListUsers' permission.")
-        return
+    client = get_iam_client()
 
+    try:
+        users = client.list_users()['Users']
+    except ClientError as e:
+        print(
+            f"❌ CRITICAL ERROR: Could not list users. Check permissions.\n"
+            f"   Details: {e}"
+        )
+        sys.exit(1)
+    except NoCredentialsError:
+        print("❌ ERROR: No AWS credentials found.")
+        print(
+            "   Please configure them via 'aws configure' or set "
+            "AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY."
+        )
+        sys.exit(1)
+
+    # Шапка таблицы
     print(f"{'USER':<25} | {'MFA':<10} | {'KEY AGE (Days)':<15} | {'STATUS'}")
-    print("-" * 70)
+    print("-" * 75)
 
     for user in users:
         username = user['UserName']
+        mfa_status = "❓ ERROR"
+        key_status = "❓ ERROR"
+        is_alert = False
 
-        # 1. Проверка MFA
-        mfa_enabled = False
-        mfa_check_failed = False
+        # --- 1. Проверка MFA ---
         try:
-            mfa = client.list_mfa_devices(UserName=username)
-            if mfa['MFADevices']:
-                mfa_enabled = True
-        except ClientError as e:
-            # Если ошибка 'NoSuchEntity' (нет MFA) - это ок, просто идем дальше
-            if e.response['Error']['Code'] == 'NoSuchEntity':
-                mfa_enabled = False
-            # Если любая ДРУГАЯ ошибка (нет прав, сеть и т.д.) - выводим её
+            # list_mfa_devices не падает, если MFA нет,
+            # он просто возвращает пустой список.
+            # Ошибки тут - это реальные проблемы с правами.
+            response = client.list_mfa_devices(UserName=username)
+            if response['MFADevices']:
+                mfa_status = "✅ ON"
             else:
-                error_code = e.response['Error']['Code']
-                error_msg = e.response['Error']['Message']
-                print(
-                    f"    ⚠️  Error checking MFA for {username}: "
-                    f"{error_code} - {error_msg}"
-                )
-                mfa_check_failed = True
+                mfa_status = "❌ OFF"
+                is_alert = True
+        except ClientError as e:
+            # Если ошибка прав доступа или другая - выводим код ошибки
+            error_code = e.response['Error']['Code']
+            mfa_status = f"⚠️ {error_code}"
+            is_alert = True
 
-        # 2. Проверка ключей доступа
-        key_status = "No Keys"
-        key_check_failed = False
+        # --- 2. Проверка ключей доступа ---
         try:
-            keys = client.list_access_keys(UserName=username)['AccessKeyMetadata']
-            if keys:
-                statuses = []
+            keys = client.list_access_keys(
+                UserName=username
+            )['AccessKeyMetadata']
+            if not keys:
+                key_status = "No Keys"
+            else:
+                # Берем самый старый ключ
+                oldest_age = 0
                 for key in keys:
                     create_date = key['CreateDate'].replace(tzinfo=None)
                     age = (datetime.datetime.now() - create_date).days
-                    if age > DAYS_LIMIT:
-                        statuses.append(f"⚠️ {age}d")
-                    else:
-                        statuses.append(f"✅ {age}d")
-                key_status = ", ".join(statuses)
-        except ClientError as e:
-            error_code = e.response['Error']['Code']
-            error_msg = e.response['Error']['Message']
-            print(
-                f"    ⚠️  Error checking keys for {username}: "
-                f"{error_code} - {error_msg}"
-            )
-            key_status = "⚠️ ERROR"
-            key_check_failed = True
+                    if age > oldest_age:
+                        oldest_age = age
 
-        # Вывод
-        if mfa_check_failed:
-            mfa_str = "⚠️ ERROR"
-        else:
-            mfa_str = "✅ ON" if mfa_enabled else "❌ OFF"
+                if oldest_age > DAYS_LIMIT:
+                    key_status = f"⚠️ OLD ({oldest_age}d)"
+                    is_alert = True
+                else:
+                    key_status = f"✅ OK ({oldest_age}d)"
 
-        # Определение статуса
-        if mfa_check_failed or key_check_failed:
-            status = '⚠️ CHECK_FAILED'
-        elif not mfa_enabled or 'OLD' in key_status or '⚠️' in key_status:
-            status = '🚨 ALERT'
-        else:
-            status = 'OK'
+        except ClientError:
+            key_status = "⚠️ Err"
 
-        print(f"{username:<25} | {mfa_str:<10} | {key_status:<15} | {status}")
+        # --- Вывод строки ---
+        row_status = "🚨 ALERT" if is_alert else "OK"
+        print(
+            f"{username:<25} | {mfa_status:<10} | "
+            f"{key_status:<15} | {row_status}"
+        )
 
 
 if __name__ == "__main__":

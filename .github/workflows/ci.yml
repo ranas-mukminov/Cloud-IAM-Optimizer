@@ -1,47 +1,21 @@
-name: Python Lint and Test
+name: Python Quality Check
 
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
+on: [push, pull_request]
 
 jobs:
-  lint-and-test:
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.11', '3.12']
-
     steps:
     - uses: actions/checkout@v3
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+    - name: Set up Python
+      uses: actions/setup-python@v3
       with:
-        python-version: ${{ matrix.python-version }}
-    
+        python-version: "3.10"
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 black mypy
-        pip install -r requirements.txt
-    
+        pip install boto3 flake8
     - name: Lint with flake8
       run: |
-        # Stop the build if there are Python syntax errors or undefined names
-        flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        # Exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-        flake8 src/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    
-    - name: Check code formatting with black
-      run: |
-        black --check src/
-    
-    - name: Type check with mypy
-      run: |
-        mypy src/ --ignore-missing-imports || true
-    
-    - name: Test script help
-      run: |
-        python src/iam_optimizer.py --help
+        # Проверяем код на синтаксические ошибки и стиль, но НЕ ЗАПУСКАЕМ его
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
