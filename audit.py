@@ -1,6 +1,6 @@
 import boto3
 import datetime
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 
 # Настройки: Считать ключи старыми, если им больше X дней
 DAYS_LIMIT = 90
@@ -13,14 +13,17 @@ def get_iam_client():
 
 def audit_users():
     """Run IAM security audit for all users."""
-    client = get_iam_client()
-
-    # Get all users with pagination and error handling
     try:
+        client = get_iam_client()
+        # Get all users with pagination and error handling
         paginator = client.get_paginator('list_users')
         users = []
         for page in paginator.paginate():
             users.extend(page['Users'])
+    except (NoCredentialsError, PartialCredentialsError):
+        print("🚨 FATAL: No AWS credentials found.")
+        print("   Please configure credentials via 'aws configure' or environment variables.")
+        return
     except ClientError as e:
         print(f"🚨 FATAL: Cannot list IAM users: {e.response['Error']['Code']}")
         print(f"   Message: {e.response['Error']['Message']}")
