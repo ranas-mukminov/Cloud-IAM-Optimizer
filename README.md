@@ -9,6 +9,43 @@ Cloud-IAM-Optimizer is a powerful tool designed to audit your cloud infrastructu
 
 **Commercial Brand:** [run-as-daemon.dev](https://run-as-daemon.dev)
 
+## Architecture
+
+```mermaid
+graph LR
+    %% Стилизация узлов
+    classDef user fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef cloud fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+    classDef secure fill:#dcfce7,stroke:#22c55e,stroke-width:2px;
+    classDef infra fill:#f3f4f6,stroke:#333,stroke-width:1px,stroke-dasharray: 5 5;
+
+    Client([👤 Client / CTO]):::user
+    
+    subgraph "Public Internet"
+        CF[☁️ Cloudflare Edge<br/>(DDoS Protection & SSL)]:::cloud
+    end
+
+    subgraph "Secure Tunnel"
+        Tunnel[🚇 CF Tunnel<br/>(No Open Ports)]:::secure
+    end
+
+    subgraph "Private Infrastructure"
+        direction TB
+        Nginx[🦁 Nginx / VitePress]:::infra
+        Dashboard[📊 Grafana / Kuma]:::infra
+    end
+
+    %% Связи
+    Client -->|HTTPS/443| CF
+    CF -->|Zero Trust| Tunnel
+    Tunnel -->|Localhost| Nginx
+    Tunnel -.->|Internal| Dashboard
+
+    %% Примечание (Link)
+    click CF "https://www.cloudflare.com/" "Provider"
+```
+
+
 ## Features
 
 - **Multi-Cloud Support:** Audit both AWS and GCP IAM policies.
@@ -17,6 +54,17 @@ Cloud-IAM-Optimizer is a powerful tool designed to audit your cloud infrastructu
 - **CLI Interface:** Easy-to-use command-line interface for integration into CI/CD pipelines.
 
 ## Quick Start
+
+### ⚡ 5-Second Audit (MVP)
+
+Run this to find security holes in 5 seconds (requires configured AWS credentials):
+
+```bash
+python audit.py
+```
+
+### Full CLI Tool
+
 
 1.  **Clone the repository:**
     ```bash
