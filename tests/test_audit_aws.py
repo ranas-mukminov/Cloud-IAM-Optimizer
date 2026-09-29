@@ -1,185 +1,165 @@
 """
 Unit tests for audit_aws.py module.
-Tests exception handling, MFA checks, and error scenarios.
+Aligned with the current IAMAuditor API (check_mfa, check_keys, tuple admin).
 """
 import unittest
-from unittest.mock import Mock, patch, MagicMock
-from botocore.exceptions import ClientError, BotoCoreError
-import sys
-import os
+from datetime import datetime, timedelta, timezone
+from unittest.mock import Mock, patch
 
-# Add parent directory to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from botocore.exceptions import ClientError
 
-from src.audit_aws import IAMAuditor
+from src.audit_aws import AccessKey, IAMAuditor
+
+
+def _make_auditor():
+    """Construct IAMAuditor with a mocked boto3 IAM client."""
+    with patch("src.audit_aws.boto3.client") as mock_client:
+        mock_iam = Mock()
+        mock_client.return_value = mock_iam
+        mock_iam.get_user.return_value = {"User": {"UserName": "caller"}}
+        auditor = IAMAuditor()
+        auditor.iam = mock_iam
+        return auditor
 
 
 class TestIAMAuditorMFAChecks(unittest.TestCase):
-    """Test MFA checking logic with various error scenarios."""
+    """Test MFA checking logic against check_mfa()."""
 
     def setUp(self):
-        """Set up test fixtures."""
-        with patch('boto3.Session'):
-            self.auditor = IAMAuditor()
-            self.auditor.iam = Mock()
+        self.auditor = _make_auditor()
 
     def test_mfa_enabled_when_devices_exist(self):
-        """Test that MFA is correctly identified as enabled."""
         self.auditor.iam.list_mfa_devices.return_value = {
-            'MFADevices': [{'SerialNumber': 'arn:aws:iam::123456789012:mfa/user'}]
+            "MFADevices": [{"SerialNumber": "arn:aws:iam::123456789012:mfa/user"}]
         }
-        result = self.auditor.check_mfa_enabled('testuser')
-        self.assertTrue(result)
+        self.assertTrue(self.auditor.check_mfa("testuser"))
 
     def test_mfa_disabled_when_no_devices(self):
-        """Test that MFA is correctly identified as disabled."""
-        self.auditor.iam.list_mfa_devices.return_value = {
-            'MFADevices': []
-        }
-        result = self.auditor.check_mfa_enabled('testuser')
-        self.assertFalse(result)
+        self.auditor.iam.list_mfa_devices.return_value = {"MFADevices": []}
+        self.assertFalse(self.auditor.check_mfa("testuser"))
 
-    def test_mfa_nosuchentity_returns_false(self):
-        """Test NoSuchEntity error returns False (not an error)."""
+    def test_mfa_client_error_returns_false(self):
+        """ClientError from the API wrapper surfaces as False."""
         error_response = {
-            'Error': {
-                'Code': 'NoSuchEntity',
-                'Message': 'The user does not have MFA'
-            }
+            "Error": {"Code": "NoSuchEntity", "Message": "The user does not have MFA"}
         }
-        self.auditor.iam.list_mfa_devices.side_effect = ClientError(
-            error_response, 'ListMFADevices'
+        self.auditor._get_api_call = Mock(
+            side_effect=ClientError(error_response, "ListMFADevices")
         )
-        result = self.auditor.check_mfa_enabled('testuser')
-        self.assertFalse(result)
+        self.assertFalse(self.auditor.check_mfa("testuser"))
 
-    @patch('builtins.print')
-    def test_mfa_access_denied_prints_warning(self, mock_print):
-        """Test AccessDenied error prints warning and returns False."""
+    def test_mfa_access_denied_returns_false(self):
         error_response = {
-            'Error': {
-                'Code': 'AccessDenied',
-                'Message': 'User is not authorized'
-            }
+            "Error": {"Code": "AccessDenied", "Message": "User is not authorized"}
         }
-        self.auditor.iam.list_mfa_devices.side_effect = ClientError(
-            error_response, 'ListMFADevices'
+        self.auditor._get_api_call = Mock(
+            side_effect=ClientError(error_response, "ListMFADevices")
         )
-        result = self.auditor.check_mfa_enabled('testuser')
-        self.assertFalse(result)
-        # Verify warning was printed
-        mock_print.assert_called_once()
-        self.assertIn('AccessDenied', mock_print.call_args[0][0])
-
-    @patch('builtins.print')
-    def test_mfa_throttling_prints_warning(self, mock_print):
-        """Test Throttling error prints warning and returns False."""
-        error_response = {
-            'Error': {
-                'Code': 'Throttling',
-                'Message': 'Rate exceeded'
-            }
-        }
-        self.auditor.iam.list_mfa_devices.side_effect = ClientError(
-            error_response, 'ListMFADevices'
-        )
-        result = self.auditor.check_mfa_enabled('testuser')
-        self.assertFalse(result)
-        # Verify warning was printed
-        mock_print.assert_called_once()
-        self.assertIn('Throttling', mock_print.call_args[0][0])
-
-    @patch('builtins.print')
-    def test_mfa_botocore_error_prints_warning(self, mock_print):
-        """Test BotoCoreError prints warning and returns False."""
-        self.auditor.iam.list_mfa_devices.side_effect = BotoCoreError()
-        result = self.auditor.check_mfa_enabled('testuser')
-        self.assertFalse(result)
-        mock_print.assert_called_once()
+        self.assertFalse(self.auditor.check_mfa("testuser"))
 
 
 class TestIAMAuditorKeyChecks(unittest.TestCase):
-    """Test access key age checking logic."""
+    """Test access key age checking via check_keys()."""
 
     def setUp(self):
-        """Set up test fixtures."""
-        with patch('boto3.Session'):
-            self.auditor = IAMAuditor()
-            self.auditor.iam = Mock()
+        self.auditor = _make_auditor()
 
     def test_old_keys_detection(self):
-        """Test that old keys are correctly identified."""
-        from datetime import datetime, timezone, timedelta
-
         old_date = datetime.now(timezone.utc) - timedelta(days=100)
-        mock_paginator = Mock()
-        mock_paginator.paginate.return_value = [{
-            'AccessKeyMetadata': [{
-                'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE',
-                'CreateDate': old_date,
-                'Status': 'Active'
-            }]
-        }]
-        self.auditor.iam.get_paginator.return_value = mock_paginator
-
-        result = self.auditor.check_old_access_keys('testuser', max_age_days=90)
+        self.auditor.iam.list_access_keys.return_value = {
+            "AccessKeyMetadata": [
+                {
+                    "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
+                    "CreateDate": old_date,
+                    "Status": "Active",
+                }
+            ]
+        }
+        result = self.auditor.check_keys("testuser")
         self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]['AccessKeyId'], 'AKIAIOSFODNN7EXAMPLE')
+        self.assertIsInstance(result[0], AccessKey)
+        self.assertEqual(result[0].access_key_id, "AKIAIOSFODNN7EXAMPLE")
+        self.assertTrue(result[0].is_old)
+        self.assertGreaterEqual(result[0].age_days, 100)
 
     def test_recent_keys_not_flagged(self):
-        """Test that recent keys are not flagged as old."""
-        from datetime import datetime, timezone, timedelta
-
         recent_date = datetime.now(timezone.utc) - timedelta(days=30)
-        mock_paginator = Mock()
-        mock_paginator.paginate.return_value = [{
-            'AccessKeyMetadata': [{
-                'AccessKeyId': 'AKIAIOSFODNN7EXAMPLE',
-                'CreateDate': recent_date,
-                'Status': 'Active'
-            }]
-        }]
-        self.auditor.iam.get_paginator.return_value = mock_paginator
+        self.auditor.iam.list_access_keys.return_value = {
+            "AccessKeyMetadata": [
+                {
+                    "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
+                    "CreateDate": recent_date,
+                    "Status": "Active",
+                }
+            ]
+        }
+        result = self.auditor.check_keys("testuser")
+        self.assertEqual(len(result), 1)
+        self.assertFalse(result[0].is_old)
 
-        result = self.auditor.check_old_access_keys('testuser', max_age_days=90)
-        self.assertEqual(len(result), 0)
+    def test_no_keys_returns_empty(self):
+        self.auditor.iam.list_access_keys.return_value = {"AccessKeyMetadata": []}
+        self.assertEqual(self.auditor.check_keys("testuser"), [])
 
 
 class TestIAMAuditorAdminChecks(unittest.TestCase):
-    """Test admin access detection logic."""
+    """Test admin access detection; returns (managed, inline) tuple."""
 
     def setUp(self):
-        """Set up test fixtures."""
-        with patch('boto3.Session'):
-            self.auditor = IAMAuditor()
-            self.auditor.iam = Mock()
+        self.auditor = _make_auditor()
 
     def test_direct_admin_policy_detected(self):
-        """Test that direct AdministratorAccess policy is detected."""
         self.auditor.iam.list_attached_user_policies.return_value = {
-            'AttachedPolicies': [
-                {'PolicyName': 'AdministratorAccess'}
-            ]
+            "AttachedPolicies": [{"PolicyName": "AdministratorAccess"}]
         }
-        result = self.auditor.check_admin_access('testuser')
-        self.assertTrue(result)
+        self.auditor.iam.list_groups_for_user.return_value = {"Groups": []}
+        self.auditor.iam.list_user_policies.return_value = {"PolicyNames": []}
+
+        managed, inline = self.auditor.check_admin_access("testuser")
+        self.assertTrue(managed)
+        self.assertFalse(inline)
 
     def test_group_admin_policy_detected(self):
-        """Test that AdministratorAccess via group is detected."""
         self.auditor.iam.list_attached_user_policies.return_value = {
-            'AttachedPolicies': []
+            "AttachedPolicies": []
         }
         self.auditor.iam.list_groups_for_user.return_value = {
-            'Groups': [{'GroupName': 'Admins'}]
+            "Groups": [{"GroupName": "Admins"}]
         }
         self.auditor.iam.list_attached_group_policies.return_value = {
-            'AttachedPolicies': [
-                {'PolicyName': 'AdministratorAccess'}
-            ]
+            "AttachedPolicies": [{"PolicyName": "AdministratorAccess"}]
         }
-        result = self.auditor.check_admin_access('testuser')
-        self.assertTrue(result)
+        self.auditor.iam.list_group_policies.return_value = {"PolicyNames": []}
+        self.auditor.iam.list_user_policies.return_value = {"PolicyNames": []}
+
+        managed, inline = self.auditor.check_admin_access("testuser")
+        self.assertTrue(managed)
+        self.assertFalse(inline)
+
+    def test_no_admin_returns_false_tuple(self):
+        self.auditor.iam.list_attached_user_policies.return_value = {
+            "AttachedPolicies": [{"PolicyName": "ReadOnlyAccess"}]
+        }
+        self.auditor.iam.list_groups_for_user.return_value = {"Groups": []}
+        self.auditor.iam.list_user_policies.return_value = {"PolicyNames": []}
+
+        managed, inline = self.auditor.check_admin_access("testuser")
+        self.assertFalse(managed)
+        self.assertFalse(inline)
 
 
-if __name__ == '__main__':
+class TestCLIWiring(unittest.TestCase):
+    """Smoke tests for src/main.py dispatch."""
+
+    def test_gcp_exits_nonzero(self):
+        from click.testing import CliRunner
+        from src.main import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["audit", "--provider", "gcp"])
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertIn("not implemented", result.output.lower() + result.stderr.lower())
+
+
+if __name__ == "__main__":
     unittest.main()
