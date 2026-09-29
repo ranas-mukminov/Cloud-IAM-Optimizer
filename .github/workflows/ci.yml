@@ -6,16 +6,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
-        python-version: "3.10"
+        python-version: "3.11"
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install boto3 flake8
+        pip install -r requirements.txt
+        pip install flake8
     - name: Lint with flake8
       run: |
-        # Проверяем код на синтаксические ошибки и стиль, но НЕ ЗАПУСКАЕМ его
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    - name: Run unit tests
+      run: |
+        python -m unittest discover -s tests -v
