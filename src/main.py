@@ -1,5 +1,8 @@
+import json
+import sys
+
 import click
-from colorama import init, Fore, Style
+from colorama import Fore, Style, init
 
 # Initialize colorama
 init(autoreset=True)
@@ -13,25 +16,48 @@ def cli():
 
 
 @cli.command()
-@click.option('--provider', type=click.Choice(['aws', 'gcp']), required=True, help='Cloud provider to audit.')
-@click.option('--output', type=click.Choice(['json', 'text']), default='text', help='Output format.')
+@click.option(
+    "--provider",
+    type=click.Choice(["aws", "gcp"]),
+    required=True,
+    help="Cloud provider to audit.",
+)
+@click.option(
+    "--output",
+    type=click.Choice(["json", "text"]),
+    default="text",
+    help="Output format.",
+)
 def audit(provider, output):
     """Run an IAM audit for the specified provider."""
-    click.echo(f"{Fore.CYAN}Starting audit for provider: {Style.BRIGHT}{provider}{Style.RESET_ALL}")
-
-    # Placeholder for logic
+    click.echo(
+        f"{Fore.CYAN}Starting audit for provider: "
+        f"{Style.BRIGHT}{provider}{Style.RESET_ALL}"
+    )
     _run_audit_logic(provider, output)
 
 
 def _run_audit_logic(provider, output):
-    """Placeholder for the actual audit logic."""
-    # In a real implementation, this would call the respective provider's audit functions
-    click.echo(f"{Fore.YELLOW}Audit logic not yet implemented for {provider}.{Style.RESET_ALL}")
-    if output == 'json':
-        click.echo('{"status": "not_implemented"}')
+    """Dispatch audit to the provider implementation."""
+    if provider == "gcp":
+        click.echo(
+            f"{Fore.RED}GCP audit is not implemented yet. "
+            f"Only --provider aws is supported.{Style.RESET_ALL}",
+            err=True,
+        )
+        sys.exit(1)
+
+    # AWS path — reuse the real auditor in audit_aws
+    from audit_aws import IAMAuditor, main as aws_main
+
+    if output == "json":
+        auditor = IAMAuditor()
+        results = auditor.run()
+        payload = [r.model_dump() for r in results]
+        click.echo(json.dumps(payload, default=str, indent=2))
     else:
-        click.echo("Status: Not Implemented")
+        aws_main()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     cli()
