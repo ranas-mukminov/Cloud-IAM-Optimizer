@@ -47,8 +47,13 @@ def _run_audit_logic(provider, output):
         )
         sys.exit(1)
 
-    # AWS path — reuse the real auditor in audit_aws
-    from audit_aws import IAMAuditor, main as aws_main
+    # AWS path — reuse the real auditor in audit_aws.
+    # Support both `python src/main.py` (sys.path has src/) and package imports
+    # used by tests / `python -m` (needs src.audit_aws).
+    try:
+        from audit_aws import IAMAuditor, main as aws_main
+    except ImportError:  # pragma: no cover - package-style import path
+        from src.audit_aws import IAMAuditor, main as aws_main
 
     if output == "json":
         auditor = IAMAuditor()
