@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
 # --- Configuration ---
 logging.basicConfig(
@@ -65,19 +65,33 @@ class IAMAuditor:
             # but it's good to log.
             logger.warning(f"Could not verify identity: {e}")
 
+    @staticmethod
+    def _is_retryable_throttle(exc: BaseException) -> bool:
+        """Retry only IAM/API throttling — not AccessDenied / NoSuchEntity."""
+        if not isinstance(exc, ClientError):
+            return False
+        code = exc.response.get("Error", {}).get("Code", "")
+        return code in {
+            "Throttling",
+            "ThrottlingException",
+            "RequestLimitExceeded",
+            "TooManyRequestsException",
+            "ServiceUnavailable",
+        }
+
     @retry(
-        retry=retry_if_exception_type(ClientError),
+        retry=retry_if_exception(lambda e: IAMAuditor._is_retryable_throttle(e)),
         stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10)
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        reraise=True,
     )
     def _get_api_call(self, func, **kwargs):
-        """Wrapper for AWS API calls with retry logic for throttling."""
+        """Wrapper for AWS API calls with retry logic for throttling only."""
         try:
             return func(**kwargs)
         except ClientError as e:
-            if e.response['Error']['Code'] == 'Throttling':
+            if self._is_retryable_throttle(e):
                 logger.warning("Throttling detected, retrying...")
-                raise e
             raise
 
     def get_all_users(self) -> List[str]:
@@ -123,6 +137,18 @@ class IAMAuditor:
             logger.error(f"Error checking keys for {username}: {e}")
         return keys
 
+
+    @staticmethod
+    def _is_administrator_access_policy(policy: dict) -> bool:
+        """Match AWS managed AdministratorAccess by name or ARN suffix.
+
+        Customer-managed copies sometimes keep the same name with a different
+        ARN; AWS managed uses ...:policy/AdministratorAccess.
+        """
+        name = policy.get("PolicyName") or ""
+        arn = policy.get("PolicyArn") or ""
+        return name == "AdministratorAccess" or arn.endswith("/AdministratorAccess")
+
     def check_admin_access(self, username: str) -> tuple[bool, bool]:
         """
         Checks for AdministratorAccess in:
@@ -137,7 +163,7 @@ class IAMAuditor:
             # 1. Managed Policies (Direct)
             attached = self._get_api_call(self.iam.list_attached_user_policies, UserName=username)
             for p in attached['AttachedPolicies']:
-                if p['PolicyName'] == 'AdministratorAccess':
+                if self._is_administrator_access_policy(p):
                     is_managed = True
 
             # 2. Managed Policies (Groups)
@@ -145,7 +171,7 @@ class IAMAuditor:
             for group in groups['Groups']:
                 g_attached = self._get_api_call(self.iam.list_attached_group_policies, GroupName=group['GroupName'])
                 for p in g_attached['AttachedPolicies']:
-                    if p['PolicyName'] == 'AdministratorAccess':
+                    if self._is_administrator_access_policy(p):
                         is_managed = True
                 
                 # Inline Group Policies
