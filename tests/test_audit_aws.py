@@ -200,7 +200,7 @@ class TestCLIWiring(unittest.TestCase):
         from unittest.mock import patch, MagicMock
 
         runner = CliRunner()
-        fake_result = MagicMock()
+        fake_result = Mock()
         fake_result.model_dump.return_value = {"username": "u", "mfa_enabled": True}
 
         with patch("src.audit_aws.IAMAuditor") as MockAud:
@@ -216,3 +216,23 @@ class TestCLIWiring(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFailClosed(unittest.TestCase):
+    """AccessDenied on keys/policies must yield ERROR, not OK."""
+
+    def setUp(self):
+        with patch("boto3.client"):
+            self.auditor = IAMAuditor()
+        self.auditor.iam = Mock()
+        self.auditor.iam.list_mfa_devices.return_value = {"MFADevices": [{"SerialNumber": "x"}]}
+        self.auditor.iam.list_access_keys.return_value = {"AccessKeyMetadata": []}
+        self.denied = ClientError({"Error": {"Code": "AccessDenied", "Message": "no"}}, "op")
+
+    def test_admin_check_denied_is_error(self):
+        self.auditor.iam.list_attached_user_policies.side_effect = self.denied
+        self.assertEqual(self.auditor.audit_single_user("u").status, "ERROR")
+
+    def test_keys_denied_is_error(self):
+        self.auditor.iam.list_access_keys.side_effect = self.denied
+        self.assertEqual(self.auditor.audit_single_user("u").status, "ERROR")
