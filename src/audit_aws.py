@@ -135,6 +135,8 @@ class IAMAuditor:
                 ))
         except ClientError as e:
             logger.error(f"Error checking keys for {username}: {e}")
+            # Fail closed: an unreadable key list must not be reported as "OK".
+            raise
         return keys
 
 
@@ -188,6 +190,9 @@ class IAMAuditor:
 
         except ClientError as e:
             logger.error(f"Error checking admin access for {username}: {e}")
+            # Fail closed: if we cannot read policies we do not know the user
+            # is non-admin, so surface it as ERROR instead of "OK".
+            raise
         
         return is_managed, is_inline
 
