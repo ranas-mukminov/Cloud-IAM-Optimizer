@@ -3,9 +3,9 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg)
 
-**AWS/GCP IAM Least Privilege Auditor**
+**AWS IAM Least Privilege Auditor**
 
-Cloud-IAM-Optimizer is a powerful tool designed to audit your cloud infrastructure's Identity and Access Management (IAM) configurations. It helps you identify over-privileged accounts and enforce the principle of least privilege across AWS and GCP environments.
+Cloud-IAM-Optimizer is a tool designed to audit AWS Identity and Access Management (IAM) configurations. It helps you identify over-privileged accounts and enforce the principle of least privilege. GCP support is planned but not implemented yet: running with `--provider gcp` currently exits with an error stating only `--provider aws` is supported.
 
 **Commercial Brand:** [run-as-daemon.dev](https://run-as-daemon.dev)
 
@@ -48,7 +48,7 @@ graph LR
 
 ## Features
 
-- **Multi-Cloud Support:** Audit both AWS and GCP IAM policies.
+- **AWS Support:** Audit AWS IAM policies. GCP is not implemented yet (see above).
 - **Least Privilege Analysis:** Identify unused permissions and risky configurations.
 - **Flexible Output:** Generate reports in JSON or human-readable text formats.
 - **CLI Interface:** Easy-to-use command-line interface for integration into CI/CD pipelines.
