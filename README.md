@@ -95,6 +95,17 @@ Options:
   --help                Show this message and exit.
 ```
 
+## Tests
+
+Unit tests use a mocked boto3 IAM client, so no cloud credentials are needed:
+
+```bash
+pip install -r requirements.txt
+python -m unittest discover -s tests -v
+```
+
+Test run verified in this update (mocked boto3, no cloud access): 17 tests, OK.
+
 ## Commercial Support
 
 We offer professional support and auditing services for your cloud infrastructure.
