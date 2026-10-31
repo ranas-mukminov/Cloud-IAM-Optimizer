@@ -1,3 +1,23 @@
+> **Problem:** AWS IAM accounts quietly accumulate over-privileged access, and the principle of least privilege has no routine check.
+>
+> **What this is:** an AWS IAM least-privilege auditor: it reviews IAM configurations, identifies over-privileged accounts and helps enforce least privilege. **AWS only — GCP is not implemented** (running with `--provider gcp` exits with an error saying so).
+>
+> **Who it is for:** AWS account owners and auditors reviewing their own accounts.
+>
+> **Quickstart:**
+>
+> ```bash
+> git clone https://github.com/ranas-mukminov/Cloud-IAM-Optimizer.git
+> cd Cloud-IAM-Optimizer
+> pip install -r requirements.txt
+> python3 -m unittest discover -s tests -v
+> ```
+>
+> **Sample result (verified with requirements installed, mocked boto3, no cloud access):** `Ran 17 tests, OK`.
+>
+[![CI](https://github.com/ranas-mukminov/Cloud-IAM-Optimizer/actions/workflows/ci.yml/badge.svg)](https://github.com/ranas-mukminov/Cloud-IAM-Optimizer/actions)
+
+---
 # Cloud-IAM-Optimizer
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
