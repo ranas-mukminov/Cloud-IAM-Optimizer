@@ -236,3 +236,55 @@ class TestFailClosed(unittest.TestCase):
     def test_keys_denied_is_error(self):
         self.auditor.iam.list_access_keys.side_effect = self.denied
         self.assertEqual(self.auditor.audit_single_user("u").status, "ERROR")
+
+
+class TestInlinePolicyParsing(unittest.TestCase):
+    """Inline admin detection must handle all valid IAM document shapes."""
+
+    def setUp(self):
+        self.auditor = _make_auditor()
+        iam = self.auditor.iam
+        iam.list_mfa_devices.return_value = {"MFADevices": [{"SerialNumber": "x"}]}
+        iam.list_access_keys.return_value = {"AccessKeyMetadata": []}
+        iam.list_attached_user_policies.return_value = {"AttachedPolicies": []}
+        iam.list_groups_for_user.return_value = {"Groups": []}
+        iam.list_user_policies.return_value = {"PolicyNames": ["inline-admin"]}
+
+    def test_single_statement_object_detected(self):
+        """"Statement": {...} (not a list) is valid IAM and must be parsed."""
+        self.auditor.iam.get_user_policy.return_value = {
+            "PolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": {"Effect": "Allow", "Action": "*", "Resource": "*"},
+            }
+        }
+        managed, inline = self.auditor.check_admin_access("u")
+        self.assertFalse(managed)
+        self.assertTrue(inline)
+        self.assertEqual(self.auditor.audit_single_user("u").status, "ADMIN")
+
+    def test_statement_list_still_detected(self):
+        self.auditor.iam.get_user_policy.return_value = {
+            "PolicyDocument": {
+                "Statement": [
+                    {"Effect": "Allow", "NotAction": "iam:*", "Resource": "*"},
+                    {"Effect": "Allow", "Action": ["*"], "Resource": ["*"]},
+                ]
+            }
+        }
+        self.assertEqual(self.auditor.check_admin_access("u"), (False, True))
+
+    def test_non_admin_inline_not_flagged(self):
+        self.auditor.iam.get_user_policy.return_value = {
+            "PolicyDocument": {
+                "Statement": {"Effect": "Allow", "Action": "s3:GetObject", "Resource": "*"}
+            }
+        }
+        self.assertEqual(self.auditor.check_admin_access("u"), (False, False))
+
+    def test_get_policy_denied_is_error(self):
+        """Unreadable inline policy must not be reported as OK."""
+        self.auditor.iam.get_user_policy.side_effect = ClientError(
+            {"Error": {"Code": "AccessDenied", "Message": "no"}}, "GetUserPolicy"
+        )
+        self.assertEqual(self.auditor.audit_single_user("u").status, "ERROR")

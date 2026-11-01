@@ -198,26 +198,33 @@ class IAMAuditor:
 
     def _check_inline_policy_doc(self, entity_name: str, policy_name: str, is_group: bool) -> bool:
         """Helper to fetch and parse inline policy document."""
-        try:
-            if is_group:
-                resp = self._get_api_call(self.iam.get_group_policy, GroupName=entity_name, PolicyName=policy_name)
-            else:
-                resp = self._get_api_call(self.iam.get_user_policy, UserName=entity_name, PolicyName=policy_name)
-            
-            doc = resp['PolicyDocument']
-            for statement in doc.get('Statement', []):
-                if statement.get('Effect') == 'Allow':
-                    actions = statement.get('Action')
-                    resources = statement.get('Resource')
-                    
-                    # Normalize to list
-                    if isinstance(actions, str): actions = [actions]
-                    if isinstance(resources, str): resources = [resources]
-                    
-                    if '*' in actions and '*' in resources:
-                        return True
-        except Exception as e:
-            logger.warning(f"Failed to parse inline policy {policy_name} for {entity_name}: {e}")
+        # Let ClientError (e.g. AccessDenied on Get*Policy) propagate so the
+        # user is reported as ERROR (fail closed), like the list calls above.
+        if is_group:
+            resp = self._get_api_call(self.iam.get_group_policy, GroupName=entity_name, PolicyName=policy_name)
+        else:
+            resp = self._get_api_call(self.iam.get_user_policy, UserName=entity_name, PolicyName=policy_name)
+
+        doc = resp.get('PolicyDocument') or {}
+        statements = doc.get('Statement', [])
+        # IAM allows a single statement object instead of a list.
+        if isinstance(statements, dict):
+            statements = [statements]
+
+        for statement in statements:
+            if not isinstance(statement, dict) or statement.get('Effect') != 'Allow':
+                continue
+            actions = statement.get('Action') or []
+            resources = statement.get('Resource') or []
+
+            # Normalize to list
+            if isinstance(actions, str):
+                actions = [actions]
+            if isinstance(resources, str):
+                resources = [resources]
+
+            if '*' in actions and '*' in resources:
+                return True
         return False
 
     def audit_single_user(self, username: str) -> UserAudit:
